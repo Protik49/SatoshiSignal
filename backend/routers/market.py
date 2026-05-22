@@ -4,7 +4,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Query
 
-from services.container import binance_ws, indicator_engine
+import services.container as svc
 from models.market import MarketSnapshot, IndicatorSet, CandleData
 
 router = APIRouter()
@@ -13,10 +13,11 @@ logger = logging.getLogger("SatoshiSignal.MarketRouter")
 
 @router.get("/current", response_model=MarketSnapshot)
 async def get_current_market():
-    if not binance_ws or not binance_ws.latest_data:
+    if not svc.binance_ws or not svc.binance_ws.latest_data:
         raise HTTPException(status_code=503, detail="Market data not yet available")
-    data = binance_ws.latest_data
-    indicators = indicator_engine.latest_indicators if indicator_engine else None
+    data = svc.binance_ws.latest_data
+    indicators = svc.indicator_engine.latest_indicators if svc.indicator_engine else None
+    ticker_24h = svc.binance_ws.ticker_24h if svc.binance_ws else {}
 
     indicator_set = None
     if indicators:
@@ -29,6 +30,7 @@ async def get_current_market():
         timestamp=data.get("timestamp"),
         indicators=indicator_set,
         is_buyer_maker=data.get("is_buyer_maker"),
+        ticker_24h=ticker_24h,
     )
 
 
@@ -37,9 +39,9 @@ async def get_candles(
     timeframe: str = Query(default="1m", description="Candle interval"),
     limit: int = Query(default=100, le=500),
 ):
-    if not binance_ws:
+    if not svc.binance_ws:
         raise HTTPException(status_code=503, detail="WebSocket not connected")
-    candles = binance_ws.get_ohlcv(limit)
+    candles = svc.binance_ws.get_ohlcv(limit)
     return {
         "timeframe": timeframe,
         "count": len(candles),
@@ -50,9 +52,9 @@ async def get_candles(
 
 @router.get("/indicators")
 async def get_indicators():
-    if not indicator_engine or not indicator_engine.latest_indicators:
+    if not svc.indicator_engine or not svc.indicator_engine.latest_indicators:
         raise HTTPException(status_code=503, detail="Indicators not yet computed")
-    indicators = indicator_engine.latest_indicators
+    indicators = svc.indicator_engine.latest_indicators
     return {
         "indicators": indicators,
         "updated_at": datetime.utcnow().isoformat(),

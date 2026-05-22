@@ -107,35 +107,38 @@ export function AccuracyTracker() {
           <span className="text-[11px] uppercase tracking-wider text-shadow-white/60 font-semibold">
             By Timeframe
           </span>
-          {by_timeframe.map((tf) => (
-            <div
-              key={tf.timeframe}
-              className="flex items-center gap-2 text-xs"
-            >
-              <span className="w-10 font-mono text-shadow-white font-semibold">
-                {tf.timeframe}
-              </span>
-              <div className="flex-1 h-2 rounded-full bg-deep-graphite overflow-hidden">
-                <motion.div
-                  className={cn("h-full rounded-full", winRateColor(tf.win_rate))}
-                  initial={{ width: 0 }}
-                  animate={{ width: `${Math.min(tf.win_rate, 100)}%` }}
-                  transition={{ duration: 0.6, ease: "easeOut" }}
-                />
-              </div>
-              <span
-                className={cn(
-                  "font-mono font-semibold w-12 text-right",
-                  winRateColor(tf.win_rate)
-                )}
+          {by_timeframe.map((tf) => {
+            const rate = tf.win_rate ?? 0
+            return (
+              <div
+                key={tf.timeframe}
+                className="flex items-center gap-2 text-xs"
               >
-                {tf.win_rate.toFixed(0)}%
-              </span>
-              <span className="text-shadow-white/50 font-mono w-12 text-right">
-                {tf.wins}/{tf.total}
-              </span>
-            </div>
-          ))}
+                <span className="w-10 font-mono text-shadow-white font-semibold">
+                  {tf.timeframe}
+                </span>
+                <div className="flex-1 h-2 rounded-full bg-deep-graphite overflow-hidden">
+                  <motion.div
+                    className={cn("h-full rounded-full", winRateColor(rate))}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${Math.min(rate, 100)}%` }}
+                    transition={{ duration: 0.6, ease: "easeOut" }}
+                  />
+                </div>
+                <span
+                  className={cn(
+                    "font-mono font-semibold w-12 text-right",
+                    winRateColor(rate)
+                  )}
+                >
+                  {rate.toFixed(0)}%
+                </span>
+                <span className="text-shadow-white/50 font-mono w-12 text-right">
+                  {tf.wins ?? 0}/{tf.total ?? 0}
+                </span>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>

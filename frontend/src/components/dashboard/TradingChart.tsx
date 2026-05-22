@@ -108,7 +108,8 @@ export function TradingChart() {
     if (candles.length === 0) return
 
     const sorted = [...candles].sort((a, b) => a.open_time - b.open_time)
-    const lineData = sorted.map(toLineData)
+    const deduped = sorted.filter((c, i) => i === 0 || c.open_time !== sorted[i - 1].open_time)
+    const lineData = deduped.map(toLineData)
 
     areaSeriesRef.current.setData(lineData)
     lineSeriesRef.current.setData(lineData)
@@ -133,7 +134,7 @@ export function TradingChart() {
           <span>1M</span>
         </div>
       </div>
-      <div ref={containerRef} className="flex-1 w-full min-h-[350px]" />
+      <div ref={containerRef} className="flex-1 w-full min-h-[250px] sm:min-h-[350px]" />
     </div>
   )
 }

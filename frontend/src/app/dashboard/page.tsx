@@ -27,6 +27,7 @@ import { TimeframeSelector } from "@/components/dashboard/TimeframeSelector"
 import { PredictionCard } from "@/components/dashboard/PredictionCard"
 import { AIFeed } from "@/components/dashboard/AIFeed"
 import { SentimentPanel } from "@/components/dashboard/SentimentPanel"
+import { NewsPanel } from "@/components/dashboard/NewsPanel"
 import { AccuracyTracker } from "@/components/dashboard/AccuracyTracker"
 import { WarmupBanner } from "@/components/dashboard/WarmupBanner"
 
@@ -73,7 +74,7 @@ export default function DashboardPage() {
     const [sentiment, fg, news] = await Promise.all([
       fetchSentiment(),
       fetchFearGreed(),
-      fetchNews(5),
+      fetchNews(10),
     ])
     if (sentiment) useMarketStore.getState().setSentiment(sentiment)
     if (fg) useMarketStore.getState().setFearGreed(fg)
@@ -111,28 +112,32 @@ export default function DashboardPage() {
 
   return (
     <DashboardShell>
-      <DashboardTwoCol className="mb-4">
+      <DashboardTwoCol className="mb-3 sm:mb-4">
         <PriceTicker />
         <TradingChart />
       </DashboardTwoCol>
 
-      <DashboardFullWidth className="mb-4">
+      <DashboardFullWidth className="mb-3 sm:mb-4">
         <WarmupBanner />
       </DashboardFullWidth>
 
-      <DashboardFullWidth className="mb-4 flex items-center justify-between">
-        <h2 className="text-heading-sm font-semibold text-cloud-white flex items-center gap-2">
+      <DashboardFullWidth className="mb-3 sm:mb-4 flex items-center justify-between">
+        <h2 className="text-lg sm:text-heading-sm font-semibold text-cloud-white flex items-center gap-2">
           <Brain className="size-5 text-chartreuse-zap" />
           AI Probability Forecasts
         </h2>
         <TimeframeSelector defaultValue={selectedTf} onChange={setSelectedTf} />
       </DashboardFullWidth>
 
-      <DashboardRow className="mb-4">
+      <DashboardRow className="mb-3 sm:mb-4">
         <PredictionCard timeframe="5m" />
         <PredictionCard timeframe="15m" />
         <PredictionCard timeframe="60m" />
       </DashboardRow>
+
+      <DashboardFullWidth className="mb-3 sm:mb-4">
+        <NewsPanel />
+      </DashboardFullWidth>
 
       <DashboardRow>
         <SentimentPanel />

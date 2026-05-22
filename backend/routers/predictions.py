@@ -3,7 +3,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Query
 
-from services.container import binance_ws, indicator_engine, sentiment_fetcher, ai_engine, prediction_tracker
+import services.container as svc
 from models.prediction import (
     PredictionRequest,
     PredictionResponse,
@@ -19,16 +19,16 @@ logger = logging.getLogger("SatoshiSignal.PredictionRouter")
 async def get_latest_prediction(
     timeframe: str = Query(default="15m", pattern="^(5m|15m|60m)$"),
 ):
-    if not indicator_engine or not indicator_engine.latest_indicators:
+    if not svc.indicator_engine or not svc.indicator_engine.latest_indicators:
         raise HTTPException(status_code=503, detail="Indicator data not yet available")
 
-    indicators = indicator_engine.latest_indicators
-    sentiment = sentiment_fetcher.get_current() if sentiment_fetcher else None
+    indicators = svc.indicator_engine.latest_indicators
+    sentiment = svc.sentiment_fetcher.get_current() if svc.sentiment_fetcher else None
 
-    if not ai_engine:
+    if not svc.ai_engine:
         raise HTTPException(status_code=503, detail="AI engine not initialized")
 
-    prediction = await ai_engine.predict(indicators, sentiment, timeframe)
+    prediction = await svc.ai_engine.predict(indicators, sentiment, timeframe)
 
     pred_response = PredictionResponse(
         bullish_pct=prediction.get("bullish_pct", 50),
@@ -42,8 +42,8 @@ async def get_latest_prediction(
         price=indicators.get("price"),
     )
 
-    if prediction_tracker:
-        await prediction_tracker.record_prediction(
+    if svc.prediction_tracker:
+        await svc.prediction_tracker.record_prediction(
             {"timeframe": timeframe, **prediction},
             indicators.get("price", 0),
         )
@@ -66,9 +66,9 @@ async def get_latest_prediction(
 
 @router.get("/history")
 async def get_prediction_history(limit: int = Query(default=50, le=200)):
-    if not prediction_tracker:
+    if not svc.prediction_tracker:
         raise HTTPException(status_code=503, detail="Prediction tracker not initialized")
-    history = prediction_tracker.get_history(limit)
+    history = svc.prediction_tracker.get_history(limit)
     for record in history:
         key_drivers_str = record.pop("key_drivers", "")
         record["key_drivers"] = [d.strip() for d in key_drivers_str.split(",")] if key_drivers_str else []
@@ -78,24 +78,24 @@ async def get_prediction_history(limit: int = Query(default=50, le=200)):
 
 @router.get("/accuracy")
 async def get_accuracy_stats():
-    if not prediction_tracker:
+    if not svc.prediction_tracker:
         raise HTTPException(status_code=503, detail="Prediction tracker not initialized")
-    return prediction_tracker.get_accuracy_stats()
+    return svc.prediction_tracker.get_accuracy_stats()
 
 
 @router.post("/verify")
 async def verify_prediction(body: VerifyRequest):
-    if not prediction_tracker:
+    if not svc.prediction_tracker:
         raise HTTPException(status_code=503, detail="Prediction tracker not initialized")
 
     entry_price = body.entry_price
     if entry_price is None:
-        history = prediction_tracker.get_history(50)
+        history = svc.prediction_tracker.get_history(50)
         matched = [h for h in history if h["id"] == body.prediction_id]
         if matched:
             entry_price = matched[0].get("entry_price", body.actual_price)
         else:
             entry_price = body.actual_price
 
-    result = await prediction_tracker.verify_manual(body.prediction_id, body.actual_price, entry_price)
+    result = await svc.prediction_tracker.verify_manual(body.prediction_id, body.actual_price, entry_price)
     return result

@@ -5,6 +5,7 @@ export { PredictionCard } from "./PredictionCard"
 export { AIFeed, generateFeedItem } from "./AIFeed"
 export type { AIFeedItem } from "@/store/marketStore"
 export { SentimentPanel } from "./SentimentPanel"
+export { NewsPanel } from "./NewsPanel"
 export { AccuracyTracker } from "./AccuracyTracker"
 export {
   DashboardShell,

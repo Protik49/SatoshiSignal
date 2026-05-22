@@ -1,14 +1,12 @@
 import asyncio
 import json
 import logging
-import random
 from datetime import datetime
 
 import httpx
 import websockets
 
 from config import BINANCE_WS_TRADE_URL, BINANCE_WS_KLINE_URL, BINANCE_REST_URL
-from services.mock_data import MockDataGenerator
 
 logger = logging.getLogger("SatoshiSignal.BinanceWS")
 
@@ -20,12 +18,9 @@ class BinanceWebSocket:
         self._connected = False
         self._running = False
         self.latest_data = {}
+        self.ticker_24h = {}
         self.candles = []
         self._lock = asyncio.Lock()
-        self._using_mock = False
-        self._mock_gen = None
-        self._connection_attempt_time = None
-        self._fallback_activated = False
 
     @property
     def is_connected(self):
@@ -33,17 +28,36 @@ class BinanceWebSocket:
 
     async def connect(self):
         self._running = True
-        self._connection_attempt_time = asyncio.get_event_loop().time()
-        self._mock_gen = MockDataGenerator(base_price=77500)
+        await self._fetch_24h_ticker()
+        asyncio.create_task(self._refresh_24h_ticker())
         asyncio.create_task(self._trade_stream())
         asyncio.create_task(self._kline_stream())
-        asyncio.create_task(self._check_connection_fallback())
-        
-        # Seed historical candles
+
+    async def _fetch_24h_ticker(self):
         try:
-            await self.seed_historical_klines(200)
+            url = f"{BINANCE_REST_URL}/ticker/24hr"
+            params = {"symbol": "BTCUSDT"}
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get(url, params=params)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    self.ticker_24h = {
+                        "price_change_pct": float(data.get("priceChangePercent", 0)),
+                        "high_24h": float(data.get("highPrice", 0)),
+                        "low_24h": float(data.get("lowPrice", 0)),
+                        "volume_24h": float(data.get("volume", 0)),
+                        "quote_volume_24h": float(data.get("quoteVolume", 0)),
+                        "trades_24h": int(data.get("count", 0)),
+                        "open_24h": float(data.get("openPrice", 0)),
+                    }
+                    logger.info(f"24h ticker: {self.ticker_24h['price_change_pct']:.2f}% change, vol ${self.ticker_24h['quote_volume_24h']/1e9:.2f}B")
         except Exception as e:
-            logger.warning(f"Failed to seed historical candles: {e}")
+            logger.error(f"Failed to fetch 24h ticker: {e}")
+
+    async def _refresh_24h_ticker(self):
+        while self._running:
+            await asyncio.sleep(60)
+            await self._fetch_24h_ticker()
 
     async def disconnect(self):
         self._running = False
@@ -56,7 +70,6 @@ class BinanceWebSocket:
                     pass
 
     async def seed_historical_klines(self, limit: int = 200):
-        """Fetch historical 1m klines from Binance REST API to populate initial candle buffer."""
         try:
             url = f"{BINANCE_REST_URL}/klines"
             params = {"symbol": "BTCUSDT", "interval": "1m", "limit": limit}
@@ -140,69 +153,6 @@ class BinanceWebSocket:
                 logger.warning(f"Kline stream disconnected: {e}. Reconnecting in {retry_delay}s...")
                 await asyncio.sleep(retry_delay)
                 retry_delay = min(retry_delay * 2, max_delay)
-
-    async def _check_connection_fallback(self):
-        """Check if connection is stuck and activate mock data after 5 seconds."""
-        await asyncio.sleep(5)
-        
-        if not self._connected and not self._fallback_activated:
-            logger.warning("Binance WebSocket connection failed to establish. Activating mock data mode.")
-            self._fallback_activated = True
-            self._using_mock = True
-            
-            # Seed mock candles
-            if self._mock_gen:
-                async with self._lock:
-                    self.candles = self._mock_gen.generate_historical_candles(200)
-            
-            # Start mock data stream
-            asyncio.create_task(self._mock_data_stream())
-
-    async def _mock_data_stream(self):
-        """Generate mock data for development/testing when Binance is unreachable."""
-        logger.info("Starting mock data stream (development mode)")
-        
-        while self._running and self._using_mock:
-            try:
-                await asyncio.sleep(random.uniform(0.5, 1.5))
-                
-                if self._mock_gen:
-                    # Generate trade tick every 500-1500ms
-                    trade_data = self._mock_gen.generate_trade_tick()
-                    async with self._lock:
-                        self.latest_data["price"] = float(trade_data["p"])
-                        self.latest_data["volume"] = float(trade_data["q"])
-                        self.latest_data["timestamp"] = trade_data["T"]
-                        self.latest_data["is_buyer_maker"] = trade_data["m"]
-                    
-                    # Generate kline every 60 seconds
-                    if random.random() < 0.02:  # ~2% chance per iteration
-                        kline_data = self._mock_gen.generate_kline()
-                        kline = kline_data.get("k", {})
-                        candle = {
-                            "open_time": kline.get("t"),
-                            "close_time": kline.get("T"),
-                            "open": float(kline.get("o", 0)),
-                            "high": float(kline.get("h", 0)),
-                            "low": float(kline.get("l", 0)),
-                            "close": float(kline.get("c", 0)),
-                            "volume": float(kline.get("v", 0)),
-                            "is_closed": kline.get("x", False),
-                        }
-                        async with self._lock:
-                            if candle["is_closed"]:
-                                self.candles.append(candle)
-                                if len(self.candles) > 500:
-                                    self.candles = self.candles[-500:]
-                            else:
-                                self.latest_data["current_candle"] = candle
-                                
-                    # Mark as connected for mock mode
-                    self._connected = True
-                    
-            except Exception as e:
-                logger.error(f"Mock data stream error: {e}")
-                await asyncio.sleep(1)
 
     def get_ohlcv(self, limit: int = 100):
         candles = self.candles[-limit:] if self.candles else []

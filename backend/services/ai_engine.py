@@ -2,7 +2,6 @@ import asyncio
 import hashlib
 import json
 import logging
-import random
 from datetime import datetime
 from typing import Optional
 
@@ -14,13 +13,12 @@ logger = logging.getLogger("SatoshiSignal.AIEngine")
 
 class AIEngine:
     def __init__(self):
-        self._model = None
+        self._client = None
         self._gemini_available = False
         if GEMINI_API_KEY:
             try:
-                import google.generativeai as genai
-                genai.configure(api_key=GEMINI_API_KEY)
-                self._model = genai.GenerativeModel(GEMINI_MODEL)
+                from google import genai
+                self._client = genai.Client(api_key=GEMINI_API_KEY)
                 self._gemini_available = True
                 logger.info(f"Gemini AI initialized with model: {GEMINI_MODEL}")
             except Exception as e:
@@ -103,7 +101,13 @@ Respond in this exact JSON format (no markdown, no extra text):
             try:
                 prompt = self._build_prompt(indicators, sentiment, timeframe)
                 loop = asyncio.get_running_loop()
-                response = await loop.run_in_executor(None, self._model.generate_content, prompt)
+                response = await loop.run_in_executor(
+                    None,
+                    lambda: self._client.models.generate_content(
+                        model=GEMINI_MODEL,
+                        contents=prompt,
+                    ),
+                )
                 result = self._parse_gemini_response(response.text)
                 if result:
                     cache_set(cache_key, result, ttl=CACHE_TTL_AI)

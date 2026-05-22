@@ -51,7 +51,6 @@ function Skeleton() {
 export function SentimentPanel() {
   const sentiment = useMarketStore((s) => s.sentiment)
   const fearGreed = useMarketStore((s) => s.fearGreed)
-  const news = useMarketStore((s) => s.news)
 
   const isLoading = !sentiment
 
@@ -155,44 +154,6 @@ export function SentimentPanel() {
                     {component}
                   </motion.li>
                 ))}
-              </ul>
-            </div>
-          )}
-
-          {news.length > 0 && (
-            <div className="space-y-1.5 pt-2 border-t border-cool-stone/50">
-              <span className="text-[11px] uppercase tracking-wider text-shadow-white/60 font-semibold">
-                Latest Headlines
-              </span>
-              <ul className="space-y-2">
-                {news.slice(0, 5).map((item, i) => {
-                  const sentimentColor =
-                    item.sentiment === "bullish"
-                      ? "bg-chartreuse-zap/20 text-chartreuse-zap"
-                      : item.sentiment === "bearish"
-                        ? "bg-alert-red/20 text-alert-red"
-                        : "bg-shadow-white/10 text-shadow-white"
-                  return (
-                    <li
-                      key={`${item.url}-${i}`}
-                      className="flex items-start gap-2"
-                    >
-                      <span
-                        className={`mt-0.5 shrink-0 text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${sentimentColor}`}
-                      >
-                        {item.sentiment === "bullish" ? "▲" : item.sentiment === "bearish" ? "▼" : "—"}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="text-xs text-silken-whisper truncate hover:text-cloud-white transition-colors">
-                          {item.title}
-                        </p>
-                        <p className="text-[10px] text-shadow-white/40 font-mono mt-0.5">
-                          {item.source}
-                        </p>
-                      </div>
-                    </li>
-                  )
-                })}
               </ul>
             </div>
           )}

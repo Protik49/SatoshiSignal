@@ -96,7 +96,6 @@ class SentimentFetcher:
                     "q": "bitcoin crypto",
                     "language": "en",
                     "size": min(limit, 10),
-                    "category": "business,technology",
                 }
                 async with httpx.AsyncClient(timeout=15) as client:
                     resp = await client.get(NEWSDATA_API_URL, params=params)
@@ -104,33 +103,44 @@ class SentimentFetcher:
                         data = resp.json()
                         if data.get("status") == "success":
                             for article in data.get("results", [])[:limit]:
-                                news_list.append({
-                                    "title": article.get("title", ""),
-                                    "url": article.get("link", ""),
-                                    "published_at": article.get("pubDate", ""),
-                                    "source": article.get("source_name", ""),
-                                    "source_url": article.get("source_url", ""),
-                                    "source_icon": article.get("source_icon", ""),
-                                    "description": article.get("description", "")[:300],
-                                    "image_url": article.get("image_url", ""),
-                                    "keywords": article.get("keywords", []) or [],
-                                    "category": article.get("category", []),
-                                    "sentiment": self._analyze_article_sentiment(
-                                        article.get("title", ""),
-                                        article.get("description", ""),
-                                    ),
-                                })
+                                try:
+                                    title = article.get("title") or ""
+                                    desc = article.get("description") or ""
+                                    if not title:
+                                        continue
+                                    news_list.append({
+                                        "title": title,
+                                        "url": article.get("link") or "",
+                                        "published_at": article.get("pubDate") or "",
+                                        "source": article.get("source_name") or "",
+                                        "source_url": article.get("source_url") or "",
+                                        "source_icon": article.get("source_icon") or "",
+                                        "description": desc[:300],
+                                        "image_url": article.get("image_url") or "",
+                                        "keywords": article.get("keywords") or [],
+                                        "category": article.get("category") or [],
+                                        "sentiment": self._analyze_article_sentiment(
+                                            title,
+                                            desc,
+                                        ),
+                                    })
+                                except Exception as e:
+                                    logger.warning(f"Failed to parse article: {e}")
+                                    continue
             except Exception as e:
                 logger.error(f"NewsData.io fetch error: {e}")
 
         if not news_list:
             news_list = self._get_fallback_news()
+            logger.warning("Using fallback news - API returned no articles")
+        else:
+            logger.info(f"Fetched {len(news_list)} news articles from NewsData.io")
 
         cache_set(cache_key, news_list, ttl=CACHE_TTL_NEWS)
         return news_list
 
-    def _analyze_article_sentiment(self, title: str, description: str) -> str:
-        text = f"{title} {description}".lower()
+    def _analyze_article_sentiment(self, title: str = "", description: str = "") -> str:
+        text = f"{title or ''} {description or ''}".lower()
         bull_count = sum(1 for kw in BULLISH_KEYWORDS if kw in text)
         bear_count = sum(1 for kw in BEARISH_KEYWORDS if kw in text)
 

@@ -11,6 +11,16 @@ export interface Candle {
   is_closed: boolean
 }
 
+export interface Ticker24h {
+  price_change_pct: number
+  high_24h: number
+  low_24h: number
+  volume_24h: number
+  quote_volume_24h: number
+  trades_24h: number
+  open_24h: number
+}
+
 export interface IndicatorData {
   rsi: number | null
   macd: number | null
@@ -112,6 +122,7 @@ interface MarketState {
   prevPrice: number | null
   volume: number | null
   timestamp: number | null
+  ticker24h: Ticker24h | null
 
   candles: Candle[]
 
@@ -145,6 +156,7 @@ interface MarketState {
   setWsConnected: (connected: boolean) => void
   setWsReconnecting: (reconnecting: boolean) => void
   setError: (error: string | null) => void
+  setTicker24h: (ticker: Ticker24h) => void
 }
 
 export const useMarketStore = create<MarketState>((set) => ({
@@ -152,6 +164,7 @@ export const useMarketStore = create<MarketState>((set) => ({
   prevPrice: null,
   volume: null,
   timestamp: null,
+  ticker24h: null,
 
   candles: [],
 
@@ -209,4 +222,6 @@ export const useMarketStore = create<MarketState>((set) => ({
     set({ wsReconnecting: reconnecting }),
 
   setError: (error: string | null) => set({ error }),
+
+  setTicker24h: (ticker: Ticker24h) => set({ ticker24h: ticker }),
 }))

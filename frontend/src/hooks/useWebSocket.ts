@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from "react"
 import { useMarketStore } from "@/store/marketStore"
 import { WS_URL } from "@/lib/constants"
-import type { Candle, IndicatorData } from "@/store/marketStore"
+import type { Candle, IndicatorData, Ticker24h } from "@/store/marketStore"
 
 const MAX_RECONNECT_DELAY = 30000
 const INITIAL_RECONNECT_DELAY = 1000
@@ -51,6 +51,10 @@ export function useWebSocket() {
 
         if (data.timestamp !== undefined) {
           useMarketStore.setState({ timestamp: data.timestamp })
+        }
+
+        if (data.ticker_24h) {
+          useMarketStore.setState({ ticker24h: data.ticker_24h as Ticker24h })
         }
 
         if (data.indicators) {

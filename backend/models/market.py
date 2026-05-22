@@ -33,9 +33,20 @@ class CandleData(BaseModel):
     is_closed: bool = False
 
 
+class Ticker24h(BaseModel):
+    price_change_pct: float = 0
+    high_24h: float = 0
+    low_24h: float = 0
+    volume_24h: float = 0
+    quote_volume_24h: float = 0
+    trades_24h: int = 0
+    open_24h: float = 0
+
+
 class MarketSnapshot(BaseModel):
     price: float
     volume: Optional[float] = None
     timestamp: Optional[int] = None
     indicators: Optional[IndicatorSet] = None
     is_buyer_maker: Optional[bool] = None
+    ticker_24h: Optional[Ticker24h] = None

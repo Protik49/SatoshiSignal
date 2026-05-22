@@ -85,6 +85,8 @@ async def websocket_market(websocket: WebSocket):
                 payload = svc.binance_ws.latest_data.copy()
                 if svc.indicator_engine and svc.indicator_engine.latest_indicators:
                     payload["indicators"] = svc.indicator_engine.latest_indicators
+                if svc.binance_ws.ticker_24h:
+                    payload["ticker_24h"] = svc.binance_ws.ticker_24h
                 try:
                     await websocket.send_json(payload)
                 except Exception:
@@ -109,5 +111,28 @@ async def health_check():
 
 
 if __name__ == "__main__":
+    import subprocess
+    import sys
+
     import uvicorn
+
+    # Kill any process already using our port
+    try:
+        result = subprocess.run(
+            ["netstat", "-ano"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        for line in result.stdout.splitlines():
+            if f":{PORT}" in line and "LISTENING" in line:
+                pid = line.strip().split()[-1]
+                logger.warning(f"Port {PORT} is in use by PID {pid}, killing it...")
+                subprocess.run(["taskkill", "/F", "/PID", pid], timeout=5)
+                import time
+                time.sleep(1)
+                break
+    except Exception:
+        pass
+
     uvicorn.run("main:app", host=HOST, port=PORT, reload=DEBUG)

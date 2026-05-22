@@ -4,7 +4,6 @@ import { motion } from "framer-motion"
 import { Zap } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ConnectionStatus } from "./ConnectionStatus"
-import { NewsTicker } from "./NewsTicker"
 
 interface DashboardShellProps {
   children: React.ReactNode
@@ -13,7 +12,7 @@ interface DashboardShellProps {
 export function DashboardShell({ children }: DashboardShellProps) {
   return (
     <div className="h-screen flex flex-col bg-midnight-oil">
-      <header className="h-14 shrink-0 flex items-center justify-between px-6 bg-midnight-oil/95 backdrop-blur-sm border-b border-iron-oxide z-10">
+      <header className="h-14 shrink-0 flex items-center justify-between px-3 sm:px-6 bg-midnight-oil/95 backdrop-blur-sm border-b border-iron-oxide z-10">
         <div className="flex items-center gap-2.5">
           <Zap className="size-5 text-chartreuse-zap" />
           <motion.span
@@ -31,9 +30,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
         </div>
       </header>
 
-      <NewsTicker />
-
-      <main className="flex-1 overflow-y-auto p-6">
+      <main className="flex-1 overflow-y-auto p-3 sm:p-6">
         {children}
       </main>
     </div>
