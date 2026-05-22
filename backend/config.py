@@ -1,12 +1,54 @@
 import os
+import logging
+import re
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
-NEWSDATA_API_KEY = os.getenv("NEWSDATA_API_KEY", "")
+logger = logging.getLogger("SatoshiSignal.Config")
+
+
+def _validate_key(key_name: str, value: str, required: bool = False, pattern: str | None = None) -> str:
+    """Validate an API key is present and matches expected format."""
+    if not value:
+        if required:
+            raise EnvironmentError(
+                f"Required environment variable {key_name} is not set. "
+                f"Add it to your backend/.env file. See backend/.env.example for reference."
+            )
+        logger.warning(f"Optional key {key_name} is not set — related features will be disabled")
+        return ""
+
+    masked = value[:4] + "..." + value[-4:] if len(value) > 12 else "***"
+    if pattern and not re.match(pattern, value):
+        raise ValueError(
+            f"Environment variable {key_name} has invalid format (got {masked}). "
+            f"Check your backend/.env file."
+        )
+    logger.info(f"{key_name} loaded ({masked})")
+    return value
+
+
+GEMINI_API_KEY = _validate_key(
+    "GEMINI_API_KEY",
+    os.getenv("GEMINI_API_KEY", ""),
+    required=True,
+    pattern=r"^AIza[A-Za-z0-9_-]{30,40}$",
+)
+
+OPENROUTER_API_KEY = _validate_key(
+    "OPENROUTER_API_KEY",
+    os.getenv("OPENROUTER_API_KEY", ""),
+    required=False,
+)
+
+NEWSDATA_API_KEY = _validate_key(
+    "NEWSDATA_API_KEY",
+    os.getenv("NEWSDATA_API_KEY", ""),
+    required=False,
+    pattern=r"^pub_[a-f0-9]{24,32}$",
+)
 
 BINANCE_WS_TRADE_URL = os.getenv(
     "BINANCE_WS_TRADE_URL", "wss://stream.binance.com:9443/ws/btcusdt@trade"
@@ -30,4 +72,4 @@ HOST = os.getenv("HOST", "0.0.0.0")
 PORT = int(os.getenv("PORT", "8000"))
 DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 
-GEMINI_MODEL = "gemma-4-31b-it"
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemma-4-31b-it")

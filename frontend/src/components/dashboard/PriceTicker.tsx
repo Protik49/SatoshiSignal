@@ -1,6 +1,6 @@
 "use client"
 
-import { motion, AnimatePresence } from "framer-motion"
+import { motion } from "framer-motion"
 import { ArrowUpRight, ArrowDownRight, Activity, BarChart3, Zap } from "lucide-react"
 import { useMarketStore } from "@/store/marketStore"
 import { cn } from "@/lib/utils"
@@ -83,14 +83,13 @@ export function PriceTicker() {
         </span>
       </div>
 
-      <div className="flex items-baseline gap-2 sm:gap-3">
-        <AnimatePresence mode="popLayout">
+      <div className="flex items-baseline gap-2 sm:gap-3 overflow-hidden">
+        <div className="relative">
           <motion.div
             key={price ?? "no-price"}
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.3, ease: "easeOut" }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
             className={cn(
               "text-3xl sm:text-[48px] font-bold leading-none font-mono tracking-tight",
               priceDirection === "up" && "text-chartreuse-zap",
@@ -100,7 +99,7 @@ export function PriceTicker() {
           >
             {price ? formatPrice(price) : "--.--"}
           </motion.div>
-        </AnimatePresence>
+        </div>
 
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}

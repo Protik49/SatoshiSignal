@@ -11,9 +11,11 @@ build/
 .vscode/
 .idea/
 
-# Environment
+# Environment — NEVER commit real API keys
 .env
 .env.local
+.env.*.local
+backend/.env
 
 # Next.js
 .next/

@@ -38,11 +38,23 @@ function formatPrice(price: number): string {
   }).format(price)
 }
 
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000"
+
 function LivePrice() {
   const [price, setPrice] = useState<number | null>(null)
   const [change, setChange] = useState<number | null>(null)
 
   useEffect(() => {
+    fetch(`${API_BASE}/api/market/current`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.price) setPrice(data.price)
+        if (data?.ticker_24h?.price_change_pct !== undefined) {
+          setChange(data.ticker_24h.price_change_pct)
+        }
+      })
+      .catch(() => {})
+
     let ws: WebSocket | null = null
 
     const connect = () => {
@@ -65,7 +77,7 @@ function LivePrice() {
 
       ws.onerror = () => ws?.close()
       ws.onclose = () => {
-        setTimeout(connect, 3000)
+        setTimeout(connect, 5000)
       }
     }
 
@@ -167,18 +179,12 @@ export default function Home() {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.35 }}
-            className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4"
           >
             <Link href="/dashboard">
-              <Button variant="hero" className="gap-2 w-full sm:w-auto">
+              <Button variant="hero" className="gap-2">
                 <Zap className="size-4" />
                 Launch Terminal
                 <ArrowRight className="size-4" />
-              </Button>
-            </Link>
-            <Link href="/dashboard">
-              <Button variant="secondary" className="w-full sm:w-auto">
-                View Dashboard
               </Button>
             </Link>
           </motion.div>
