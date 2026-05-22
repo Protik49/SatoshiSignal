@@ -112,9 +112,11 @@ Respond in this exact JSON format (no markdown, no extra text):
                 logger.error(f"Gemini prediction error: {e}")
 
         result = self._fallback_prediction(
-            f"AI unavailable — deterministic assessment based on RSI={indicators.get('rsi')}, "
-            f"MACD trend={indicators.get('conditions', {}).get('macd')}",
+            f"Deterministic assessment based on {len(indicators.get('conditions', {}))} indicators: "
+            f"RSI={indicators.get('rsi')}, "
+            f"MACD={indicators.get('conditions', {}).get('macd')}",
             timeframe,
+            indicators,
         )
         return result
 
@@ -137,19 +139,84 @@ Respond in this exact JSON format (no markdown, no extra text):
                 if not isinstance(data["key_drivers"], list):
                     data["key_drivers"] = [str(data["key_drivers"])]
                 data["key_drivers"] = data["key_drivers"][:5]
+                bull = data["bullish_pct"]
+                bear = data["bearish_pct"]
+                data["predicted_direction"] = "bullish" if bull > bear else "bearish" if bear > bull else "neutral"
                 return data
         except (json.JSONDecodeError, KeyError, ValueError) as e:
             logger.warning(f"Failed to parse Gemini response: {e}")
         return None
 
-    def _fallback_prediction(self, reasoning: str, timeframe: str) -> dict:
-        bull = random.randint(45, 55)
-        bear = 100 - bull
+    def _fallback_prediction(self, reasoning: str, timeframe: str, indicators: dict = None) -> dict:
+        bull = 50
+        bear = 50
+        drivers = ["Insufficient data for reliable prediction"]
+
+        if indicators:
+            conditions = indicators.get("conditions", {})
+            bullish_signals = 0
+            bearish_signals = 0
+
+            if conditions.get("macd") == "bullish":
+                bullish_signals += 1
+                drivers.append("MACD (bullish crossover)")
+            elif conditions.get("macd") == "bearish":
+                bearish_signals += 1
+                drivers.append("MACD (bearish crossover)")
+
+            if conditions.get("ema_cross") == "bullish":
+                bullish_signals += 1
+                drivers.append("EMA 9/21 (bullish cross)")
+            elif conditions.get("ema_cross") == "bearish":
+                bearish_signals += 1
+                drivers.append("EMA 9/21 (bearish cross)")
+
+            if conditions.get("trend_50") and "above" in conditions.get("trend_50", ""):
+                bullish_signals += 1
+                drivers.append("Price above EMA 50 (bullish trend)")
+            elif conditions.get("trend_50") and "below" in conditions.get("trend_50", ""):
+                bearish_signals += 1
+                drivers.append("Price below EMA 50 (bearish trend)")
+
+            if conditions.get("rsi") == "oversold":
+                bullish_signals += 1
+                drivers.append("RSI oversold (contrarian bullish)")
+            elif conditions.get("rsi") == "overbought":
+                bearish_signals += 1
+                drivers.append("RSI overbought (contrarian bearish)")
+
+            if conditions.get("bollinger") == "below_lower (oversold)":
+                bullish_signals += 1
+                drivers.append("BB oversold (mean reversion up)")
+            elif conditions.get("bollinger") == "above_upper (overbought)":
+                bearish_signals += 1
+                drivers.append("BB overbought (mean reversion down)")
+
+            pct_change = indicators.get("price_change_5m", 0)
+            if pct_change > 0.3:
+                bullish_signals += 1
+                drivers.append(f"Momentum positive (+{pct_change:.2f}% in 5m)")
+            elif pct_change < -0.3:
+                bearish_signals += 1
+                drivers.append(f"Momentum negative ({pct_change:.2f}% in 5m)")
+
+            total = bullish_signals + bearish_signals
+            if total > 0:
+                bull = int(50 + (bullish_signals - bearish_signals) / total * 35)
+                bear = 100 - bull
+                bull = max(10, min(90, bull))
+                bear = 100 - bull
+
+        direction = "bullish" if bull > bear else "bearish" if bear > bull else "neutral"
+        confidence = "Medium" if abs(bull - bear) > 15 else "Low"
+        if abs(bull - bear) > 30:
+            confidence = "High"
+
         return {
             "bullish_pct": bull,
             "bearish_pct": bear,
-            "confidence": "Low",
+            "confidence": confidence,
             "reasoning": reasoning[:200],
-            "key_drivers": ["Insufficient data for reliable prediction"],
-            "predicted_direction": "bullish" if bull > bear else "bearish" if bear > bull else "neutral",
+            "key_drivers": drivers[:5],
+            "predicted_direction": direction,
         }

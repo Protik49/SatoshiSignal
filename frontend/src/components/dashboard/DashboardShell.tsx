@@ -4,6 +4,7 @@ import { motion } from "framer-motion"
 import { Zap } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ConnectionStatus } from "./ConnectionStatus"
+import { NewsTicker } from "./NewsTicker"
 
 interface DashboardShellProps {
   children: React.ReactNode
@@ -29,6 +30,8 @@ export function DashboardShell({ children }: DashboardShellProps) {
           <ConnectionStatus />
         </div>
       </header>
+
+      <NewsTicker />
 
       <main className="flex-1 overflow-y-auto p-6">
         {children}

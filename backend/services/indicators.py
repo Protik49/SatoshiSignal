@@ -14,6 +14,24 @@ class IndicatorEngine:
         self._lock = asyncio.Lock()
 
     async def periodic_update(self, binance_ws):
+        # Compute initial indicators immediately
+        logger.info("Computing initial indicators...")
+        await asyncio.sleep(1)  # Give WebSocket 1 second to get first data
+        
+        for attempt in range(10):  # Try up to 10 times with delays
+            candles = binance_ws.get_ohlcv(100)
+            if len(candles) >= 14:
+                try:
+                    indicators = self.compute(candles)
+                    async with self._lock:
+                        self.latest_indicators = indicators
+                    logger.info(f"Initial indicators computed successfully. Price: {indicators.get('price')}")
+                    break
+                except Exception as e:
+                    logger.warning(f"Initial indicator computation attempt {attempt + 1} failed: {e}")
+            await asyncio.sleep(1)
+        
+        # Then continue with periodic updates every 5 seconds
         while True:
             await asyncio.sleep(5)
             candles = binance_ws.get_ohlcv(100)
@@ -60,10 +78,25 @@ class IndicatorEngine:
                 result[f"ema_{period}"] = float(round(ema.iloc[-1], 2)) if not pd.isna(ema.iloc[-1]) else None
 
             # Bollinger Bands
-            bb = ta.bbands(df["close"], length=20, std=2)
-            result["bb_upper"] = float(round(bb.iloc[-1]["BBU_20_2.0"], 2)) if not pd.isna(bb.iloc[-1]["BBU_20_2.0"]) else None
-            result["bb_middle"] = float(round(bb.iloc[-1]["BBM_20_2.0"], 2)) if not pd.isna(bb.iloc[-1]["BBM_20_2.0"]) else None
-            result["bb_lower"] = float(round(bb.iloc[-1]["BBL_20_2.0"], 2)) if not pd.isna(bb.iloc[-1]["BBL_20_2.0"]) else None
+            try:
+                bb = ta.bbands(df["close"], length=20, std=2)
+                bb_cols = bb.columns.tolist()
+                # Handle different column naming conventions
+                bb_upper_col = next((c for c in bb_cols if 'BBU' in c), None)
+                bb_middle_col = next((c for c in bb_cols if 'BBM' in c), None)
+                bb_lower_col = next((c for c in bb_cols if 'BBL' in c), None)
+                
+                if bb_upper_col:
+                    result["bb_upper"] = float(round(bb.iloc[-1][bb_upper_col], 2)) if not pd.isna(bb.iloc[-1][bb_upper_col]) else None
+                if bb_middle_col:
+                    result["bb_middle"] = float(round(bb.iloc[-1][bb_middle_col], 2)) if not pd.isna(bb.iloc[-1][bb_middle_col]) else None
+                if bb_lower_col:
+                    result["bb_lower"] = float(round(bb.iloc[-1][bb_lower_col], 2)) if not pd.isna(bb.iloc[-1][bb_lower_col]) else None
+            except Exception as e:
+                logger.warning(f"Bollinger Bands calculation failed: {e}")
+                result["bb_upper"] = None
+                result["bb_middle"] = None
+                result["bb_lower"] = None
 
             # ATR (volatility)
             atr = ta.atr(df["high"], df["low"], df["close"], length=14)
