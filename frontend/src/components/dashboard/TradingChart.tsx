@@ -3,46 +3,41 @@
 import { useEffect, useRef, useCallback } from "react"
 import {
   createChart,
-  CandlestickSeries,
-  HistogramSeries,
+  AreaSeries,
+  LineSeries,
   type IChartApi,
   type ISeriesApi,
   type Time,
-  type CandlestickData,
-  type HistogramData,
 } from "lightweight-charts"
 import { useMarketStore, type Candle } from "@/store/marketStore"
 
-function toCandlestickData(c: Candle) {
+function toLineData(c: Candle) {
   return {
     time: (c.open_time / 1000) as Time,
-    open: c.open,
-    high: c.high,
-    low: c.low,
-    close: c.close,
+    value: c.close,
   }
 }
 
-function toVolumeData(c: Candle) {
-  const isUp = c.close >= c.open
-  return {
-    time: (c.open_time / 1000) as Time,
-    value: c.volume,
-    color: isUp ? "rgba(250, 255, 105, 0.3)" : "rgba(255, 117, 117, 0.3)",
-  }
+const CHART_COLORS = {
+  areaTop: "rgba(250, 255, 105, 0.25)",
+  areaBottom: "rgba(250, 255, 105, 0.02)",
+  line: "#faff69",
 }
 
 export function TradingChart() {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
-  const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null)
-  const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null)
+  const areaSeriesRef = useRef<ISeriesApi<"Area"> | null>(null)
+  const lineSeriesRef = useRef<ISeriesApi<"Line"> | null>(null)
   const candles = useMarketStore((s) => s.candles)
+  const price = useMarketStore((s) => s.price)
 
   const handleResize = useCallback(() => {
     if (chartRef.current && containerRef.current) {
-      const { width, height } = containerRef.current.getBoundingClientRect()
-      chartRef.current.resize(width, height)
+      chartRef.current.resize(
+        containerRef.current.clientWidth,
+        containerRef.current.clientHeight
+      )
     }
   }, [])
 
@@ -55,12 +50,10 @@ export function TradingChart() {
         textColor: "#bcbcbb",
       },
       grid: {
-        vertLines: { color: "#282828" },
-        horzLines: { color: "#282828" },
+        vertLines: { color: "#282828", style: 2 },
+        horzLines: { color: "#282828", style: 2 },
       },
-      crosshair: {
-        mode: 0,
-      },
+      crosshair: { mode: 1 },
       timeScale: {
         borderColor: "#343434",
         timeVisible: true,
@@ -68,71 +61,79 @@ export function TradingChart() {
       },
       rightPriceScale: {
         borderColor: "#343434",
+        autoScale: true,
       },
+      handleScroll: false,
+      handleScale: false,
     })
 
-    const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: "#faff69",
-      downColor: "#ff7575",
-      borderUpColor: "#faff69",
-      borderDownColor: "#ff7575",
-      wickUpColor: "#a0a0a0",
-      wickDownColor: "#a0a0a0",
+    const areaSeries = chart.addSeries(AreaSeries, {
+      lineColor: CHART_COLORS.line,
+      topColor: CHART_COLORS.areaTop,
+      bottomColor: CHART_COLORS.areaBottom,
+      lineWidth: 2,
+      priceLineVisible: true,
+      priceLineColor: "rgba(250, 255, 105, 0.4)",
+      priceLineWidth: 1,
     })
 
-    const volumeSeries = chart.addSeries(HistogramSeries, {
-      priceFormat: {
-        type: "volume",
-      },
-      priceScaleId: "",
+    const lineSeries = chart.addSeries(LineSeries, {
+      color: CHART_COLORS.line,
+      lineWidth: 2,
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: false,
     })
 
-    volumeSeries.priceScale().applyOptions({
-      scaleMargins: {
-        top: 0.8,
-        bottom: 0,
-      },
-    })
+    chart.timeScale().fitContent()
 
     chartRef.current = chart
-    candleSeriesRef.current = candleSeries
-    volumeSeriesRef.current = volumeSeries
+    areaSeriesRef.current = areaSeries
+    lineSeriesRef.current = lineSeries
 
-    window.addEventListener("resize", handleResize)
+    const observer = new ResizeObserver(handleResize)
+    observer.observe(containerRef.current)
 
     return () => {
-      window.removeEventListener("resize", handleResize)
+      observer.disconnect()
       chart.remove()
       chartRef.current = null
-      candleSeriesRef.current = null
-      volumeSeriesRef.current = null
+      areaSeriesRef.current = null
+      lineSeriesRef.current = null
     }
   }, [handleResize])
 
   useEffect(() => {
-    if (!candleSeriesRef.current || !volumeSeriesRef.current) return
+    if (!areaSeriesRef.current || !lineSeriesRef.current) return
     if (candles.length === 0) return
 
     const sorted = [...candles].sort((a, b) => a.open_time - b.open_time)
+    const lineData = sorted.map(toLineData)
 
-    candleSeriesRef.current.setData(sorted.map(toCandlestickData))
-    volumeSeriesRef.current.setData(sorted.map(toVolumeData))
+    areaSeriesRef.current.setData(lineData)
+    lineSeriesRef.current.setData(lineData)
+    chartRef.current?.timeScale().fitContent()
   }, [candles])
 
   return (
-    <div className="bg-smokey-carbon rounded-lg border border-cool-stone overflow-hidden flex flex-col">
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-cool-stone/50">
+    <div className="bg-smokey-carbon rounded-lg border border-cool-stone overflow-hidden flex flex-col h-full">
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-cool-stone/50 shrink-0">
         <div className="flex items-center gap-1.5">
-          <div className="size-2 rounded-full bg-chartreuse-zap" />
-          <span className="text-xs font-semibold text-silken-whisper uppercase tracking-wider font-mono">
-            BTC/USDT
+          <div className="size-2 rounded-full bg-chartreuse-zap animate-pulse-glow" />
+          <span className="text-xs font-semibold text-cloud-white uppercase tracking-wider font-mono">
+            BTC / USDT
           </span>
         </div>
-        <span className="text-[10px] text-shadow-white/50 font-mono ml-auto">
-          1m candles
-        </span>
+        <div className="ml-auto flex items-center gap-2 text-[10px] font-mono text-shadow-white/50">
+          {price && (
+            <span className="text-chartreuse-zap font-semibold text-xs">
+              ${price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+          )}
+          <span>1M</span>
+        </div>
       </div>
-      <div ref={containerRef} className="flex-1 w-full min-h-[400px]" />
+      <div ref={containerRef} className="flex-1 w-full min-h-[350px]" />
     </div>
   )
 }

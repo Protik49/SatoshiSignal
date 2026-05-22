@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { motion } from "framer-motion"
 import { Brain } from "lucide-react"
 import { useMarketStore } from "@/store/marketStore"
@@ -28,18 +28,29 @@ import { PredictionCard } from "@/components/dashboard/PredictionCard"
 import { AIFeed } from "@/components/dashboard/AIFeed"
 import { SentimentPanel } from "@/components/dashboard/SentimentPanel"
 import { AccuracyTracker } from "@/components/dashboard/AccuracyTracker"
-import { IndicatorBar } from "@/components/dashboard/IndicatorBar"
+import { WarmupBanner } from "@/components/dashboard/WarmupBanner"
 
 const TIMEFRAMES = ["5m", "15m", "60m"] as const
 
 export default function DashboardPage() {
   const [selectedTf, setSelectedTf] = useState("15m")
+  const [warmedUp, setWarmedUp] = useState(false)
 
   const price = useMarketStore((s) => s.price)
   const wsConnected = useMarketStore((s) => s.wsConnected)
-  const indicators = useMarketStore((s) => s.indicators)
 
   useWebSocket()
+
+  useEffect(() => {
+    fetchCandles("1m", 100).then((candles) => {
+      if (candles && candles.length > 0) {
+        useMarketStore.getState().setCandles(candles)
+      }
+    }).catch(console.error)
+
+    const timer = setTimeout(() => setWarmedUp(true), 8000)
+    return () => clearTimeout(timer)
+  }, [])
 
   const pollPredictions = useCallback(async () => {
     for (const tf of TIMEFRAMES) {
@@ -49,14 +60,14 @@ export default function DashboardPage() {
         useMarketStore.getState().addAIFeedItem({
           id: `${Date.now()}-${tf}`,
           timestamp: new Date().toISOString(),
-          message: `${tf}: ${result.predicted_direction} bias ${result.bullish_pct}% — ${result.reasoning}`,
+          message: `${tf}: ${result.predicted_direction} bias ${result.bullish_pct}% (${result.confidence}). ${result.reasoning}`,
           type: "prediction",
         })
       }
     }
   }, [])
 
-  usePolling(pollPredictions, 15000, true)
+  usePolling(pollPredictions, 20000, warmedUp)
 
   const pollSentiment = useCallback(async () => {
     const [sentiment, fg, news] = await Promise.all([
@@ -69,7 +80,7 @@ export default function DashboardPage() {
     if (news) useMarketStore.getState().setNews(news)
   }, [])
 
-  usePolling(pollSentiment, 60000, true)
+  usePolling(pollSentiment, 60000, warmedUp)
 
   const pollAccuracy = useCallback(async () => {
     const [acc, hist] = await Promise.all([
@@ -80,13 +91,7 @@ export default function DashboardPage() {
     if (hist) useMarketStore.getState().setHistory(hist)
   }, [])
 
-  usePolling(pollAccuracy, 30000, true)
-
-  useEffect(() => {
-    fetchCandles("1m", 100).then((candles) => {
-      if (candles) useMarketStore.getState().setCandles(candles)
-    }).catch(() => {})
-  }, [])
+  usePolling(pollAccuracy, 45000, warmedUp)
 
   if (price === null && !wsConnected) {
     return (
@@ -108,11 +113,12 @@ export default function DashboardPage() {
     <DashboardShell>
       <DashboardTwoCol className="mb-4">
         <PriceTicker />
-        <div className="flex flex-col gap-3">
-          <TradingChart />
-          <IndicatorBar />
-        </div>
+        <TradingChart />
       </DashboardTwoCol>
+
+      <DashboardFullWidth className="mb-4">
+        <WarmupBanner />
+      </DashboardFullWidth>
 
       <DashboardFullWidth className="mb-4 flex items-center justify-between">
         <h2 className="text-heading-sm font-semibold text-cloud-white flex items-center gap-2">

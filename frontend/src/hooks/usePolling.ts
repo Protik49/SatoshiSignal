@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useCallback } from "react"
 
 export function usePolling(
   callback: () => Promise<void>,
@@ -22,8 +22,10 @@ export function usePolling(
     }
 
     const tick = () => {
-      savedCallback.current()
+      savedCallback.current().catch(() => {})
     }
+
+    tick()
 
     intervalRef.current = setInterval(tick, interval)
 
